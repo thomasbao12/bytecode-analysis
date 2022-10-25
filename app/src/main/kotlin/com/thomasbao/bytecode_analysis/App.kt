@@ -3,10 +3,13 @@
  */
 package com.thomasbao.bytecode_analysis
 
-import org.apache.bcel.classfile.ClassParser
-import org.apache.bcel.Const
+import java.nio.file.Files
+import java.nio.file.Paths
 import org.apache.bcel.classfile.ConstantClass
-import java.io.File
+import org.apache.bcel.classfile.ConstantUtf8
+import org.apache.bcel.classfile.ClassParser
+import kotlin.io.path.pathString
+import kotlin.io.path.writeLines
 
 class App {
     val greeting: String
@@ -15,17 +18,27 @@ class App {
         }
 }
 
-fun main(args: Array<String>) {
-    val filepath = args.first()
-    println("Parsing file: ${filepath}")
-    val classParser = ClassParser(filepath)
-    val javaClass = classParser.parse()
-    println("Parsed!")
-
-    val constantPool = javaClass.constantPool
-    constantPool.map { it as? ConstantClass }.filterNotNull().forEach {
-      val classRef = constantPool.getConstantUtf8(it.nameIndex)
-      println(classRef)
-    }
-
+fun getConstantPoolClassRefs(filepath: String):List<ConstantUtf8> {
+  val classParser = ClassParser(filepath)
+  val javaClass = classParser.parse()
+  val constantPool = javaClass.constantPool
+  return constantPool.map { it as? ConstantClass }.filterNotNull().map {
+    constantPool.getConstantUtf8(it.nameIndex)
+  }
 }
+
+fun main(args: Array<String>) {
+    val inputDirPath = args[0]
+    val outputDirPath = args[1]
+    Files.walk(
+        Paths.get(inputDirPath)
+    ).forEach {
+      if (it.fileName.toString().endsWith(".class")) {
+        println("parsing ${it.fileName}")
+        val classRefs = getConstantPoolClassRefs(it.pathString)
+        val out = Files.createFile(Paths.get(outputDirPath, it.fileName.toString() + ".refs"))
+        out.writeLines(classRefs.map { it.toString() } )
+      }
+    }
+}
+
