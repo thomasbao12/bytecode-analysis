@@ -13,8 +13,13 @@ import org.jgrapht.graph.DefaultEdge
 import org.jgrapht.Graph
 import org.jgrapht.alg.shortestpath.FloydWarshallShortestPaths
 import org.jgrapht.traverse.BreadthFirstIterator
+import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.stream.Collectors
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.relativeTo
 
@@ -32,7 +37,7 @@ fun getConstantPoolClassRefs(filepath: String): Set<String> {
 
 class Klass(val classPath: String, val classRefs: Set<String>)
 
-fun getKlassFromFile(classPath: String, classRefs: Set<String>): Klass {
+fun getAirbnbKlass(classPath: String, classRefs: Set<String>): Klass {
     return Klass(
       classPath,
       classRefs.filter { it.startsWith(AIRBNB_PACKAGE) && it != classPath }.toSet()
@@ -44,33 +49,45 @@ fun main(args: Array<String>) {
 
     val sourcePackage = args[1]
 
-    val g: Graph<String, DefaultEdge> = DefaultDirectedGraph<String, DefaultEdge>(DefaultEdge::class.java)
-    val gg: MutableGraph<String> = GraphBuilder.directed().build()
 
+
+    val files = mutableSetOf<Path>()
     Files.walk(
         Paths.get(inputDirPath + "/" + AIRBNB_PACKAGE)
     ).forEach {
+      files.add(it)
+    }
+
+    val klasses = Collections.synchronizedSet(HashSet<Klass>())
+    val count = AtomicInteger(0)
+    files.parallelStream().forEach {
       if (it.fileName.toString().endsWith(".class")) {
         val classPath = it.toAbsolutePath().relativeTo(Paths.get(inputDirPath)).toString().removeSuffix(".class")
-        println("parsing ${classPath}")
-
         val classRefs = getConstantPoolClassRefs(it.absolutePathString())
+        val klass = getAirbnbKlass(classPath, classRefs)
+        klasses.add(klass)
 
-
-
-        g.addVertex(classPath)
-        gg.addNode(classPath)
-        classRefs.filter { it.startsWith(AIRBNB_PACKAGE) && it != classPath }.forEach {
-          g.addVertex(it)
-          g.addEdge(classPath, it)
-          gg.addNode(it)
-          gg.putEdge(classPath, it)
+        if (count.incrementAndGet() % 1000 == 0) {
+          println("processed $count classfiles so far")
         }
+
       }
     }
 
+    println("Finished parsing ${klasses.size} classFiles")
+    val gg: MutableGraph<String> = GraphBuilder.directed().build()
 
-  println("Graph has ${g.vertexSet().size} nodes and ${g.edgeSet().size} edges")
+    klasses.forEach {
+      val source = it.classPath
+      gg.addNode(source)
+      it.classRefs.forEach {
+        gg.addNode(it)
+        gg.putEdge(source, it)
+      }
+    }
+
+  println("Graph has ${gg.nodes().size} nodes and ${gg.edges().size} edges")
+
 
   val startingNodes = gg.nodes().filter {
     it.startsWith(sourcePackage)
@@ -80,7 +97,8 @@ fun main(args: Array<String>) {
     gg.successors(it)
   }.flatten().toSet()
 
-  println("dora service has ${reachableNodes.size} reachable class files")
+
+  println("$sourcePackage has ${reachableNodes.size} reachable class files")
 
 
 
