@@ -4,6 +4,7 @@
 package com.thomasbao.bytecode_analysis
 
 import com.google.common.graph.GraphBuilder
+import com.google.common.graph.Graphs
 import com.google.common.graph.MutableGraph
 import com.google.common.graph.Graph as GuavaGraph
 import org.apache.bcel.classfile.ClassParser
@@ -94,7 +95,7 @@ fun main(args: Array<String>) {
   }.toSet()
 
   val reachableNodes = startingNodes.map {
-    gg.successors(it)
+    Graphs.reachableNodes(gg, it)
   }.flatten().toSet()
 
 
