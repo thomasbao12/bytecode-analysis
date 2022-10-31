@@ -3,12 +3,16 @@
  */
 package com.thomasbao.bytecode_analysis
 
+import com.google.common.graph.GraphBuilder
+import com.google.common.graph.MutableGraph
+import com.google.common.graph.Graph as GuavaGraph
 import org.apache.bcel.classfile.ClassParser
 import org.apache.bcel.classfile.ConstantClass
 import org.jgrapht.graph.DefaultDirectedGraph
 import org.jgrapht.graph.DefaultEdge
 import org.jgrapht.Graph
 import org.jgrapht.alg.shortestpath.FloydWarshallShortestPaths
+import org.jgrapht.traverse.BreadthFirstIterator
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.io.path.absolutePathString
@@ -38,9 +42,11 @@ fun getKlassFromFile(classPath: String, classRefs: Set<String>): Klass {
 fun main(args: Array<String>) {
     val inputDirPath = args[0]
 
-    //val outputDirPath = args[1]
+    val sourcePackage = args[1]
 
     val g: Graph<String, DefaultEdge> = DefaultDirectedGraph<String, DefaultEdge>(DefaultEdge::class.java)
+    val gg: MutableGraph<String> = GraphBuilder.directed().build()
+
     Files.walk(
         Paths.get(inputDirPath + "/" + AIRBNB_PACKAGE)
     ).forEach {
@@ -53,15 +59,34 @@ fun main(args: Array<String>) {
 
 
         g.addVertex(classPath)
+        gg.addNode(classPath)
         classRefs.filter { it.startsWith(AIRBNB_PACKAGE) && it != classPath }.forEach {
           g.addVertex(it)
           g.addEdge(classPath, it)
+          gg.addNode(it)
+          gg.putEdge(classPath, it)
         }
       }
     }
 
-  val floydWarshall = FloydWarshallShortestPaths(g)
+
   println("Graph has ${g.vertexSet().size} nodes and ${g.edgeSet().size} edges")
-  println("ShortestsPaths count: ${floydWarshall.shortestPathsCount})")
+
+  val startingNodes = gg.nodes().filter {
+    it.startsWith(sourcePackage)
+  }.toSet()
+
+  val reachableNodes = startingNodes.map {
+    gg.successors(it)
+  }.flatten().toSet()
+
+  println("dora service has ${reachableNodes.size} reachable class files")
+
+
+
+
+
+  //val floydWarshall = FloydWarshallShortestPaths(g)
+  //println("ShortestsPaths count: ${floydWarshall.shortestPathsCount})")
 }
 
