@@ -51,7 +51,6 @@ fun main(args: Array<String>) {
     val sourcePackage = args[1]
 
 
-
     val files = mutableSetOf<Path>()
     Files.walk(
         Paths.get(inputDirPath + "/" + AIRBNB_PACKAGE)
@@ -100,7 +99,20 @@ fun main(args: Array<String>) {
 
 
   println("$sourcePackage has ${reachableNodes.size} reachable class files")
+  reachableNodes.forEach {
+    println(it)
+  }
 
+  val reachableClasses = reachableNodes.map {
+    it.toString()
+  }
+
+  val classPaths = klasses.map {
+    it.classPath
+  }
+
+  val unreachableClasspaths = classPaths.subtract(reachableClasses)
+  println(unreachableClasspaths.filter { it.contains("/dora/") })
 
 
 
